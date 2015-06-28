@@ -1,12 +1,12 @@
 package utils.funston.com.sample;
 
+import android.app.Activity;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 
 
-public class TestActivity extends AppCompatActivity {
+public class TestActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
