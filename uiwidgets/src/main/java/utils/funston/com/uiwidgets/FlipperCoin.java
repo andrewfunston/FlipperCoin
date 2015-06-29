@@ -7,6 +7,9 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.OvalShape;
 import android.os.Build;
@@ -16,17 +19,23 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.CompoundButton;
-import android.widget.TextView;
 
-public class FlipperCoin extends TextView implements OnClickListener{
+public class FlipperCoin extends View implements OnClickListener {
 
     AttributeSet mAttrs;
     Resources mResources;
     int mPixelDiameter;
 
+    String mCurString = "20";
+    int mAnimationDuration = 150;
+
+    Paint mTextPaint;
+    Paint mDebugPaint;
+
     ShapeDrawable mCurShown;
     ShapeDrawable mCoinFront;
     ShapeDrawable mCoinBack;
+    ScaleDrawable mCheck;
 
     private OnCheckedChangeListener mCheckedChangeListener;
 
@@ -55,18 +64,30 @@ public class FlipperCoin extends TextView implements OnClickListener{
         mAttrs = attrs;
         mResources = context.getResources();
         mPixelDiameter = (int) mResources.getDimension(R.dimen.fab_size_mini);
+        Log.e("tag", mPixelDiameter + "");
+
 
         mCoinFront = new ShapeDrawable(new OvalShape());
         mCoinFront.getPaint().setColor(mResources.getColor(R.color.primary));
+        mCoinFront.getPaint().setFlags(Paint.ANTI_ALIAS_FLAG);
         mCoinFront.setBounds(0, 0, mPixelDiameter, mPixelDiameter);
 
         mCoinBack = new ShapeDrawable(new OvalShape());
-        mCoinBack.getPaint().setColor(mResources.getColor(R.color.accent));
+        mCoinBack.getPaint().setColor(mResources.getColor(R.color.divider));
+        mCoinBack.getPaint().setFlags(Paint.ANTI_ALIAS_FLAG);
         mCoinBack.setBounds(0, 0, mPixelDiameter, mPixelDiameter);
 
-        mCurShown = mCoinFront;
+        mCheck = new ScaleDrawable(context);
 
-        setText("A");
+        mTextPaint = new Paint();
+        mTextPaint.setFlags(Paint.ANTI_ALIAS_FLAG);
+        mTextPaint.setColor(mResources.getColor(android.R.color.white));
+        mTextPaint.setTextSize(mResources.getDimension(R.dimen.labels_text_size));
+
+        mDebugPaint = new Paint();
+        mDebugPaint.setColor(mResources.getColor(android.R.color.holo_red_light));
+
+        mCurShown = mCoinFront;
 
         setOnClickListener(this);
     }
@@ -75,13 +96,31 @@ public class FlipperCoin extends TextView implements OnClickListener{
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        setMeasuredDimension(mPixelDiameter, mPixelDiameter);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         mCurShown.draw(canvas);
-        super.onDraw(canvas);
+        if (mCurShown == mCoinFront) {
+            drawText(canvas);
+        } else {
+            mCheck.draw(canvas);
+        }
+    }
+
+    private void drawText(Canvas canvas) {
+        final Rect textBounds = new Rect();
+        mTextPaint.getTextBounds(mCurString, 0, mCurString.length(), textBounds);
+
+        final int canvasHalf = getWidth() / 2;
+
+        final int mTextWidth = (int) mTextPaint.measureText(mCurString);
+        final int halfWidth = mTextWidth / 2;
+        final int mTextHeight = textBounds.height();
+        final int halfHeight = mTextHeight / 2;
+
+        canvas.drawText(mCurString, canvasHalf - halfWidth, canvasHalf + halfHeight, mTextPaint);
     }
 
     public void setOnCheckedChangeListener(final OnCheckedChangeListener onCheckedChangeListener) {
@@ -90,27 +129,49 @@ public class FlipperCoin extends TextView implements OnClickListener{
 
     /* Private */
 
-    private int getCircleSize() {
-        return getResources().getDimensionPixelSize(R.dimen.fab_size_mini);
-    }
+    public class ScaleDrawable {
 
+        Drawable checkDrawable;
+        float mScale = 1.0f;
+        float intrisictWidth;
 
-    private ShapeDrawable createCircleDrawable(int color) {
-        final ShapeDrawable shapeDrawable = new ShapeDrawable(new OvalShape());
-        shapeDrawable.getPaint().setColor(color);
-        return shapeDrawable;
+        ScaleDrawable(Context context) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                checkDrawable = context.getResources().getDrawable(R.drawable.ic_done_white_24dp, context.getTheme());
+            } else {
+                checkDrawable = context.getResources().getDrawable(R.drawable.ic_done_white_24dp);
+            }
+
+            intrisictWidth = checkDrawable.getIntrinsicWidth();
+        }
+
+        public void setScale(final float scale) {
+            mScale = scale;
+            invalidate();
+        }
+
+        public void draw(Canvas canvas) {
+            final int viewWidth = getWidth() / 2;
+            final int half = (int) ((intrisictWidth * mScale) / 2);
+            checkDrawable.setBounds(viewWidth - half, viewWidth - half, viewWidth + half, viewWidth + half);
+            checkDrawable.draw(canvas);
+        }
     }
 
     @Override
     public void onClick(View v) {
-        Log.v("FUCK", "onClick");
+        if (mCurShown == mCoinFront) {
+            flipToBack();
+        } else {
+            flipToFront();
+        }
+    }
 
+    public void flipToBack() {
+        mCheck.setScale(0f);
 
-//        RotateAnimation rotate = new RotateAnimation(0, 360, Animation.RELATIVE_TO_SELF, 0.5f,  Animation.RELATIVE_TO_SELF, 0.5f);
-//        rotate.setDuration(1000);
-//        this.startAnimation(rotate);
         final ObjectAnimator objectAnimator1 = ObjectAnimator.ofFloat(this, "rotationY", 0f, 90f);
-        objectAnimator1.setDuration(250);
+        objectAnimator1.setDuration(mAnimationDuration);
         objectAnimator1.setInterpolator(new AccelerateDecelerateInterpolator(getContext(), mAttrs));
         objectAnimator1.addListener(new Animator.AnimatorListener() {
             @Override
@@ -141,15 +202,57 @@ public class FlipperCoin extends TextView implements OnClickListener{
         });
 
         final ObjectAnimator objectAnimator2 = ObjectAnimator.ofFloat(this, "rotationY", 90f, 0f);
-        objectAnimator2.setDuration(250);
+        objectAnimator2.setDuration(mAnimationDuration);
+        objectAnimator2.setInterpolator(new AccelerateDecelerateInterpolator(getContext(), mAttrs));
+
+        final ObjectAnimator scaleAnimation = ObjectAnimator.ofFloat(mCheck, "scale", 0f, 1f);
+        scaleAnimation.setDuration(mAnimationDuration + 100);
+        scaleAnimation.setInterpolator(new AccelerateDecelerateInterpolator(getContext(), mAttrs));
+
+        final AnimatorSet animatorSet = new AnimatorSet();
+        animatorSet.play(objectAnimator1).before(objectAnimator2).before(scaleAnimation);
+        animatorSet.start();
+    }
+
+    public void flipToFront() {
+        final ObjectAnimator objectAnimator1 = ObjectAnimator.ofFloat(this, "rotationY", 0f, 90f);
+        objectAnimator1.setDuration(mAnimationDuration);
+        objectAnimator1.setInterpolator(new AccelerateDecelerateInterpolator(getContext(), mAttrs));
+        objectAnimator1.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (mCurShown == mCoinFront) {
+                    mCurShown = mCoinBack;
+                } else {
+                    mCurShown = mCoinFront;
+                }
+
+                invalidate();
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animation) {
+
+            }
+        });
+
+        final ObjectAnimator objectAnimator2 = ObjectAnimator.ofFloat(this, "rotationY", 90f, 0f);
+        objectAnimator2.setDuration(mAnimationDuration);
         objectAnimator2.setInterpolator(new AccelerateDecelerateInterpolator(getContext(), mAttrs));
 
         final AnimatorSet animatorSet = new AnimatorSet();
         animatorSet.play(objectAnimator1).before(objectAnimator2);
         animatorSet.start();
-
-//        final Animation animation = AnimationUtils.loadAnimation(getContext(), R.anim.card_flip_left_out);
-//        this.startAnimation(animation);
     }
 
     /* Inner Classes */
